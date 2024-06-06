@@ -40,11 +40,9 @@ whitebox_params = WhiteBoxParams(;
 )
 
 surrogate = WhiteBoxMDP(whitebox_params)
-Random.seed!(surrogate.params.seed)
-
 target_model = gpt_model("gpt-3.5-turbo")
-mdp = BlackBoxMDP(params.target_model, surrogate, whitebox_params.prompt)
-mdp.flipped = params.is_aligned
+
+mdp = BlackBoxMDP(target_model, surrogate, whitebox_params.prompt)
 s0 = rand(initialstate(mdp))
 
 policy = solve(solver, mdp)
