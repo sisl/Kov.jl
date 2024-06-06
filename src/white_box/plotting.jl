@@ -31,7 +31,7 @@ function print_llm(prompt::String, response::String; prefix="", response_color=:
     end
     pretty_table(["$(prefix)Prompt" prompt; "$(prefix)Response" response];
         body_hlines=[1],
-        noheader=true,
+        show_header=false,
         autowrap=true,
         linebreaks=true,
         crop=:none,
