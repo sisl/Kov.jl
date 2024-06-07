@@ -20,6 +20,8 @@ Below are results showing MCTS experiments trained using Vicuna-7b as the white-
     <img src="./media/example-adversarial-prompt.png">
 </p>
 
+Note that information was redacted for safety's sake.
+
 # Setup
 
 Ensure that the following enviroment variables are set:
