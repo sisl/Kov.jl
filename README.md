@@ -24,6 +24,12 @@ Note that information was redacted for safety's sake.
 
 # Setup
 
+Install the Julia package via:
+```julia
+using Pkg
+Pkg.add(url="https://github.com/sisl/Kov.jl")
+```
+
 Ensure that the following enviroment variables are set:
 - `OPENAI_API_KEY`
 - `LLAMA_API_KEY`
