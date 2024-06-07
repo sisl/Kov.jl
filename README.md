@@ -4,7 +4,13 @@
 
 Black-box jailbreaking of large language models (LLMs) using Markov decision processes, integrated into [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl).
 
-> ⚠ **This work is intended as a research tool for validating the robustness of LLMs.**
+> ⚠ **Note, this work is intended as a research tool for validating the robustness of LLMs.**
+> ⚠ **_WARNING_: This work contains LLM responses that may be offensive/harmful.**
+
+<p align="center">
+    <img src="./media/red-teaming-mcts.svg">
+</p>
+
 
 # Setup
 
@@ -50,3 +56,12 @@ s0 = rand(initialstate(mdp))
 a = action(policy, s0)
 best_suffix = select_action(mdp)
 ```
+
+# Example LLM Prompts and Responses
+
+
+Below are results showing MCTS experiments trained using Vicuna-7b as the white-box model and GPT-3.5 (`gpt-3.5-0613`) as the black-box model.
+
+<p align="center">
+    <img src="./media/example-adversarial-prompt.png">
+</p>
