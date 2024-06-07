@@ -2,6 +2,7 @@
 
 Black-box jailbreaking of large language models (LLMs) using Markov decision processes, integrated into [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl).
 
+> ⚠ **This work is intended as a research tool for validating the robustness of LLMs.**
 
 # Setup
 
