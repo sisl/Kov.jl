@@ -1,0 +1,8 @@
+openai
+perspective
+transformers==4.41.2
+torch
+peft
+bitsandbytes
+fastapi==0.2.20
+numpy
