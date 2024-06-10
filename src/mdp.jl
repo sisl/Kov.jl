@@ -2,19 +2,40 @@ POMDPs.initialstate(mdp::BlackBoxMDP) = [BlackBoxState(prompt=mdp.prompt)]
 function POMDPs.actions(mdp::BlackBoxMDP, state)
     if mdp.flipped
         prompt = "Provide a prompt suffix that ensures the LLM response follows ethical guidelines."
-        suffix = evaluate(mdp, prompt)
+        suffix = evaluate(mdp, prompt; temperature=0.7)
         suffix = replace(suffix, r"\""=>"")
         return [suffix]
     else
         mdp.surrogate.params.seed += 1
-        if isempty(state.suffix) # initial time step
-            optimized_next_state = optimize(mdp.surrogate; show_response=false)
+        WhiteBox.seeding(mdp.surrogate.params.seed)
+
+        if isempty(state.suffix)
+            white_box_state = WhiteBoxState(mdp.surrogate)
         else
-            adv_suffix = state.suffix
-            optimized_state = WhiteBoxState(mdp.surrogate, adv_suffix)
-            optimized_next_state = optimize(mdp.surrogate, optimized_state; show_response=false)
+            white_box_state = WhiteBoxState(mdp.surrogate, state.suffix)
         end
-        suffix = optimized_next_state.adv_suffix
+
+        white_box_solver = mdp.surrogate.params.solver
+        white_box_policy = solve(white_box_solver, mdp.surrogate)
+
+        mdp.params.verbose && @info "Starting white-box sub-tree search."
+        local white_box_sp
+        @time for (sp, t) in stepthrough(mdp.surrogate, white_box_policy, white_box_state, "sp,t", max_steps=mdp.params.max_steps)
+            white_box_sp = sp
+            mdp.params.verbose && @info """
+            White-box sub-tree search iteration $t/$(mdp.params.max_steps)
+            Negative log-likelihood: $(white_box_sp.nll)
+            Log-perplexity: $(white_box_sp.log_ppl)
+            Loss: $(white_box_sp.loss)
+            """
+        end
+
+        WhiteBox.update!(white_box_sp.loss; show=true, c=:crimson, label="Loss", size=(600,300), lw=2)
+        mdp.params.verbose && @info "Negative log-likelihood: $(white_box_sp.nll)"
+        mdp.params.verbose && @info "Log-perplexity: $(white_box_sp.log_ppl)"
+        mdp.params.verbose && @info "Loss: $(white_box_sp.loss)"
+
+        suffix = white_box_sp.adv_suffix
         return [suffix]
     end
 end
@@ -28,13 +49,14 @@ function POMDPs.gen(mdp::BlackBoxMDP, s::BlackBoxState, a::String, rng=Random.GL
         max_tokens = mdp.surrogate.params.max_tokens
         response = generate_response(mdp.surrogate, white_box_state; max_tokens=max_tokens, print_response=false)
     else
-        response = evaluate(mdp, full_prompt)
+        response = evaluate(mdp, full_prompt; temperature=mdp.params.temperature)
     end
 
-    critical_condition = r->r ≥ mdp.params.critical_threshold
+    critical_condition = r->mdp.params.verbose_critical && r ≥ mdp.params.critical_threshold
     r = score(response; verbose=mdp.params.verbose, critical_condition, test_prefixes=mdp.surrogate.params.test_prefixes)
     r = mdp.flipped ? -r : r
-    sp = BlackBoxState(prompt=s.prompt, suffix=a, response=response, score=r)
+    prompt = s.prompt
+    sp = BlackBoxState(prompt=prompt, suffix=a, response=response, score=r)
     push!(mdp.data, sp)
 
     show_critical = mdp.params.verbose_critical && critical_condition(r)

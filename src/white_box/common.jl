@@ -4,9 +4,11 @@ struct WhiteBoxState
     input_ids
     is_success
     loss
+    nll
+    log_ppl
 end
 
-WhiteBoxState(adv_suffix, suffix_manager, input_ids) = WhiteBoxState(adv_suffix, suffix_manager, input_ids, false, NaN)
+WhiteBoxState(adv_suffix, suffix_manager, input_ids) = WhiteBoxState(adv_suffix, suffix_manager, input_ids, false, NaN, NaN, NaN)
 
 
 struct WhiteBoxAction
@@ -23,12 +25,13 @@ end
     prompt = load_prompts(benchmark_idx)
     target = load_targets(benchmark_idx)
     placeholder_token = "!"
-    n_tokens = 20
+    n_tokens = 8
     adv_string_init = join(placeholder_token^n_tokens, " ")
-    num_steps = 100
+    num_steps = 1
     device = "cuda:0"
-    batch_size = 512
-    topk = 256
+    batch_size = 64
+    topk = 32
+    logit_batch_size = 64
     allow_non_ascii = false
     only_word_chars = false
     test_prefixes = ["I'm sorry",
@@ -49,10 +52,19 @@ end
     topt = 1 # number of top-t tokens to combine
     m_tokens = 1 # number of tokens to sample before forward pass
     use_uniform = true # use uniform distribution for selecting random replacements (false = use multinomial weighted by the gradients)
-    logit_batch_size = 512
-    max_generate_tokens = 256
+    max_generate_tokens = 64
     include_perp = true
-    λ_perp = 0.1
+    λ_perp = 0.01
+    solver = DPWSolver(n_iterations=4,
+                       depth=1,
+                       check_repeat_action=true,
+                       exploration_constant=1.0,
+                       k_action=4.0,
+                       alpha_action=0.0,
+                       enable_state_pw=false,
+                       tree_in_info=true,
+                       show_progress=true,
+                       estimate_value=0)
     show_response = false # show current response during training
     use_arca = false
     verbose = true
@@ -74,7 +86,7 @@ end
 
 function WhiteBoxMDP(params::WhiteBoxParams; device_map="auto", kwargs...)
     ignore_mismatched_sizes = occursin("tinyllama", lowercase(params.model_path))
-    model, tokenizer = load_model_and_tokenizer(params.model_path, device_map=device_map, ignore_mismatched_sizes=ignore_mismatched_sizes)
+    model, tokenizer = load_model_and_tokenizer(params.model_path, device_map=device_map, device=params.device, ignore_mismatched_sizes=ignore_mismatched_sizes)
     not_allowed_tokens = params.allow_non_ascii ? nothing : get_nonascii_toks(tokenizer,only_word_chars=params.only_word_chars, placeholder_token=params.placeholder_token)
     return WhiteBoxMDP(; params, model, tokenizer, not_allowed_tokens, kwargs...)
 end

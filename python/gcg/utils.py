@@ -375,29 +375,39 @@ def forward(*, model, input_ids, attention_mask, batch_size=512):
 
     return torch.cat(logits, dim=0)
 
-def target_loss(logits, ids, target_slice, control_slice, include_perp=False, lambda_perp=0.1, flipped_perp=False):
+def target_loss(logits, ids, target_slice, control_slice, goal_slice, include_perp=False, lambda_perp=0.1, flipped_perp=False, return_separate=False):
     crit = nn.CrossEntropyLoss(reduction='none')
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
     loss = crit(logits[:,loss_slice,:].transpose(1,2), ids[:,target_slice])
     losses = loss.mean(dim=-1)
-    if include_perp:
-        log_ppls = lambda_perp*log_perplexity(logits, ids[:,control_slice], return_all=True)
-        if flipped_perp:
-            losses = losses - log_ppls
+    full_prompt_slice = slice(goal_slice.start, control_slice.stop)
+    log_ppls = lambda_perp*log_perplexity(logits, ids[:,full_prompt_slice], return_all=True)
+    if flipped_perp:
+        log_ppls = -log_ppls
+    if return_separate:
+        return losses, log_ppls
+    else:
+        if include_perp:
+            return losses + log_ppls
         else:
-            losses = losses + log_ppls
-    return losses
-
+            return losses
 
 def load_model_and_tokenizer(model_path, tokenizer_path=None, device='cuda:0', device_map='auto', **kwargs):
-    model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=torch.float16,
-            trust_remote_code=True,
-            device_map=device_map,
-            **kwargs
-        ).eval()
-        # ).to(device).eval()
+    if device_map is None:
+        model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+                trust_remote_code=True,
+                **kwargs
+            ).to(device).eval()
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+                trust_remote_code=True,
+                device_map=device_map,
+                **kwargs
+            ).eval()
 
     tokenizer_path = model_path if tokenizer_path is None else tokenizer_path
 

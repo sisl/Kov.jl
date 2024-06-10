@@ -11,6 +11,8 @@ using CSV
 using BSON
 using PrettyTables
 using DataFrames
+using MCTS
+using POMDPTools
 @reexport using POMDPs
 @reexport using PyCall
 @reexport using .WhiteBox
@@ -20,7 +22,6 @@ export
     BlackBoxMDP,
     gpt_model,
     llama_model,
-    guanaco_model,
     vicuna_model,
     evaluate,
     completion,
@@ -38,6 +39,8 @@ export
     value_estimate,
     transfer,
     test_transfer,
+    extract_suffixes,
+    extract_suffix,
     print_box
 
 global Perspective, OpenAI, PeftModel, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, torch

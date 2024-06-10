@@ -1,5 +1,8 @@
 module WhiteBox
 
+include(joinpath(@__DIR__, "..", "LivePlots.jl"))
+
+using .LivePlots
 using Reexport
 using Random
 using Statistics
@@ -8,6 +11,7 @@ using Pkg
 using Plots
 using CSV
 using DataFrames
+using MCTS
 @reexport using PrettyTables
 @reexport using POMDPs
 @reexport using PyCall
@@ -134,7 +138,7 @@ function setgcg!(mdp::WhiteBoxMDP)
     mdp.params.m_tokens = 1
     mdp.params.use_uniform = true
     mdp.params.use_arca = false
-    mdp.params.λ_perp = 0 # redundant
+    mdp.params.include_perp = false
 end
 
 

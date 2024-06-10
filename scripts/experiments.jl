@@ -3,8 +3,7 @@ using Kov
 using BSON
 using POMDPTools
 using Random
-
-include("solver.jl")
+using Plots; default(fontfamily="Computer Modern", framestyle=:box)
 
 MODEL_ON_LOCALHOST = false
 RUN_BEST = false
@@ -14,28 +13,13 @@ if @isdefined(surrogate)
     surrogate.params.seed = 0 # reset seed
 else
     model_path = expanduser("~/vicuna/vicuna-7b-v1.5")
-    # model_path = expanduser("~/vicuna/vicuna-13b-v1.5")
-    # model_path = expanduser("~/llama/llama-2-7b-chat-hf")
 
-    whitebox_params = WhiteBoxParams(;
-        model_path,
-        n_tokens=20,
-        batch_size=32,
-        topk=16,
-        logit_batch_size=32,
-        num_steps=2,
-        break_on_success=false,
-        include_perp=true,
-        λ_perp=0.1,
-        verbose=true,
-        verbose_critical=true,
-        device="cuda",
-    )
+    whitebox_params = WhiteBoxParams(; model_path)
 
     if MODEL_ON_LOCALHOST
         surrogate = WhiteBoxMDP(params=whitebox_params, conv_template=missing)
     else
-        surrogate = WhiteBoxMDP(whitebox_params)
+        surrogate = WhiteBoxMDP(whitebox_params; device_map=nothing)
     end
 end
 
@@ -45,16 +29,17 @@ for benchmark_idx in 1:5
     Kov.change_benchmark!(surrogate, benchmark_idx)
     Random.seed!(surrogate.params.seed)
 
+    empty!(surrogate.data)
+
     @info "Benchmark index $benchmark_idx: $(surrogate.params.prompt)"
 
     ########################################
     ## Change this for different models
     ########################################
-    params = (name="gpt3-advbench$benchmark_idx", is_aligned=false, target_model=gpt_model("gpt-3.5-turbo"))
-    # params = (name="gpt4-advbench$benchmark_idx", is_aligned=false, target_model=gpt_model("gpt-4"))
+    # params = (name="gpt3-advbench$benchmark_idx", is_aligned=true, target_model=gpt_model("gpt-3.5-turbo-0125"))
+    params = (name="gpt3-advbench$benchmark_idx", is_aligned=false, target_model=gpt_model("gpt-3.5-turbo-0125"))
+    # params = (name="gpt4-advbench$benchmark_idx", is_aligned=false, target_model=gpt_model("gpt-4-1106-preview"))
     # params = (name="vicuna-7b-advbench$benchmark_idx", is_aligned=false, target_model=vicuna_model("vicuna-7b-v1.5"))
-    # params = (name="vicuna-13b-advbench$benchmark_idx", is_aligned=false, target_model=vicuna_model("vicuna-13b-v1.5"))
-    # params = (name="llama-2-advbench$benchmark_idx", is_aligned=false, target_model=llama_model("llama-2-7b-chat-hf"; is_local=true))
 
     surrogate.params.flipped = params.is_aligned
     prompt = whitebox_params.prompt
@@ -62,9 +47,11 @@ for benchmark_idx in 1:5
     mdp.flipped = params.is_aligned
     s0 = rand(initialstate(mdp))
 
+    Kov.WhiteBox.clear!()
+
     if !RUN_BASELINE
-        policy = solve(solver, mdp)
-        a, info = action_info(policy, s0)
+        policy = solve(mdp.params.solver, mdp)
+        @time a, info = action_info(policy, s0)
         suffix = select_action(mdp)
         printstyled("[BEST ACTION]: $suffix\n", color=:cyan)
 
@@ -88,9 +75,9 @@ for benchmark_idx in 1:5
     else
         R_baseline, data_baseline = run_baseline(mdp, solver.n_iterations)
         mods_baseline = compute_moderation(mdp)
-        BSON.@save "$(params.name)-baseline-advbench$(whitebox_params.benchmark_idx)-scores.bson" R_baseline
-        BSON.@save "$(params.name)-baseline-advbench$(whitebox_params.benchmark_idx)-data.bson" data_baseline
-        BSON.@save "$(params.name)-baseline-advbench$(whitebox_params.benchmark_idx)-moderation.bson" mods_baseline
+        BSON.@save "$(params.name)-baseline-scores.bson" R_baseline
+        BSON.@save "$(params.name)-baseline-data.bson" data_baseline
+        BSON.@save "$(params.name)-baseline-moderation.bson" mods_baseline
         mod_rate_baseline = Kov.avg_moderated(mods_baseline)
         mod_score_baseline = Kov.avg_moderated_score(mods_baseline)
         @info "Failed moderation rate (baseline): $mod_rate_baseline"

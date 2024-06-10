@@ -1,4 +1,4 @@
-function transfer(prompt, suffixes, target_model; verbose=true)
+function transfer(prompt, suffixes, target_model; temperature=0, verbose=true, kwargs...)
     responses = []
     scores = []
     mods = []
@@ -6,10 +6,10 @@ function transfer(prompt, suffixes, target_model; verbose=true)
         @info "Suffix $i/$(length(suffixes))"
         full_prompt = prompt * " " * suffix
 
-        response = evaluate(target_model, full_prompt)
+        response = evaluate(target_model, full_prompt; temperature)
         push!(responses, response)
 
-        r = score(response; verbose=verbose)
+        r = score(response; verbose=verbose, kwargs...)
         push!(scores, r)
 
         # TODO. print_box
@@ -31,14 +31,20 @@ Take the suffixes from a training procedure and test the transfer to a target mo
 e.g.,
     fn_training_data = i->"gpt3-kov-value-mgcg-advbench\$i-adv-mdp-data.bson"
 """
-function test_transfer(fn_training_data::Function, target_model; benchmark_indices=1:5)
+function test_transfer(fn_training_data::Function, target_model; is_baseline=false, n=1, benchmark_indices=1:5, temperature=0, kwargs...)
     results = Dict()
     for benchmark_idx in benchmark_indices
         @info "Testing transfer on AdvBench index $benchmark_idx"
-        data = BSON.load(fn_training_data(benchmark_idx))[:data]
-        prompt = data[1].prompt
-        suffixes = map(d->d.suffix, data)
-        responses, scores, mods = transfer(prompt, suffixes, target_model)
+        if is_baseline
+            prompt = load_prompts(benchmark_idx)
+            suffixes = fill("", n)
+        else
+            data = BSON.load(fn_training_data(benchmark_idx))[:data]
+            prompt = data[1].prompt
+            suffix = extract_suffix(fn_training_data, benchmark_idx)
+            suffixes = fill(suffix, n)
+        end
+        responses, scores, mods = transfer(prompt, suffixes, target_model; temperature, kwargs...)
         results[benchmark_idx] = Dict(
             :prompt=>prompt,
             :suffixes=>suffixes,
@@ -48,4 +54,18 @@ function test_transfer(fn_training_data::Function, target_model; benchmark_indic
         )
     end
     return results
+end
+
+function extract_suffix(fn_training_data, benchmark_idx)
+    data = BSON.load(fn_training_data(benchmark_idx))[:data]
+    idx = argmax(map(d->d.score, data))
+    return data[idx].suffix
+end
+
+function extract_suffixes(fn_training_data::Function; benchmark_indices=1:5)
+    prompts = Dict()
+    for benchmark_idx in benchmark_indices
+        prompts[benchmark_idx] = extract_suffix(fn_training_data, benchmark_idx)
+    end
+    return prompts
 end

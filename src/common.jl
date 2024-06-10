@@ -10,6 +10,18 @@ end
 BlackBoxState(prompt::String, suffix::String, response::String) = BlackBoxState(; prompt, suffix, response)
 
 @with_kw mutable struct BlackBoxParams
+    solver = DPWSolver(n_iterations=10,
+                       depth=2,
+                       check_repeat_action=true,
+                       exploration_constant=1.0,
+                       k_action=2.0,
+                       alpha_action=0.0,
+                       enable_state_pw=false,
+                       tree_in_info=true,
+                       show_progress=true,
+                       estimate_value=0)
+    max_steps = 10 # maximum white-box MDP environment steps when calling `POMDPTools.stepthrough`
+    temperature = 0
     verbose = true
     verbose_critical = true
     critical_threshold = 0.05

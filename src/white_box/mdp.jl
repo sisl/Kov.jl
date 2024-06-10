@@ -8,7 +8,7 @@ end
 
 
 WhiteBoxState(mdp::WhiteBoxMDP) = WhiteBoxState(mdp, mdp.params.adv_string_init)
-function WhiteBoxState(mdp::WhiteBoxMDP, adv_suffix; check_success=false, loss=NaN)
+function WhiteBoxState(mdp::WhiteBoxMDP, adv_suffix; check_success=false, loss=NaN, nll=NaN, log_ppl=NaN)
     params, model, tokenizer = mdp.params, mdp.model, mdp.tokenizer
 
     suffix_manager = initialize_suffix_manager(mdp)
@@ -29,7 +29,7 @@ function WhiteBoxState(mdp::WhiteBoxMDP, adv_suffix; check_success=false, loss=N
         is_success = false
     end
 
-    return WhiteBoxState(adv_suffix, suffix_manager, input_ids, is_success, loss)
+    return WhiteBoxState(adv_suffix, suffix_manager, input_ids, is_success, loss, nll, log_ppl)
 end
 
 
@@ -114,7 +114,7 @@ function POMDPs.gen(mdp::WhiteBoxMDP, state::WhiteBoxState, act, rng=Random.GLOB
 
     torch.set_grad_enabled(false)
 
-    local loss, best_new_adv_suffix
+    local loss, best_new_adv_suffix, nll, log_ppl
     try
         # Step 3.4 Compute loss on these candidates and take the argmin.
         logits, ids = get_logits(model=model,
@@ -125,25 +125,34 @@ function POMDPs.gen(mdp::WhiteBoxMDP, state::WhiteBoxState, act, rng=Random.GLOB
                                 return_ids=true,
                                 batch_size=params.logit_batch_size) # decrease this number if you run into OOM.
 
-        losses = target_loss(logits,
-                            ids,
-                            state.suffix_manager._target_slice,
-                            state.suffix_manager._control_slice,
-                            include_perp=params.include_perp,
-                            lambda_perp=params.λ_perp,
-                            flipped_perp=params.flipped)
+        losses, log_ppls = target_loss(logits,
+                                    ids,
+                                    state.suffix_manager._target_slice,
+                                    state.suffix_manager._control_slice,
+                                    state.suffix_manager._goal_slice,
+                                    include_perp=params.include_perp,
+                                    lambda_perp=params.λ_perp,
+                                    flipped_perp=params.flipped,
+                                    return_separate=true)
+
+        if params.include_perp
+            combined_losses = losses + log_ppls
+        else
+            combined_losses = losses
+        end
 
         if params.flipped
-            best_new_adv_suffix_id = losses.argmax() # maximize the negative log-likelihood (i.e., minimize the likelihood)
+            best_new_adv_suffix_id = combined_losses.argmax() # maximize the negative log-likelihood (i.e., minimize the likelihood)
         else
-            best_new_adv_suffix_id = losses.argmin() # minimize the negative log-likelihood (i.e., maximize the likelihood)
+            best_new_adv_suffix_id = combined_losses.argmin() # minimize the negative log-likelihood (i.e., maximize the likelihood)
         end
 
         if params.topt == 1
             # Single top-token
             best_new_adv_suffix = py"$act[$best_new_adv_suffix_id]"
-            loss = losses.__getitem__(best_new_adv_suffix_id)
-            loss = loss.detach().cpu().numpy()[1]
+            loss = combined_losses.__getitem__(best_new_adv_suffix_id).detach().cpu().numpy()[1]
+            nll = losses.__getitem__(best_new_adv_suffix_id).detach().cpu().numpy()[1]
+            log_ppl = log_ppls.__getitem__(best_new_adv_suffix_id).detach().cpu().numpy()[1] / params.λ_perp
         else
             # Multiple top-t tokens
             best_new_adv_suffix_ids = torch.topk(losses, params.topt, largest=params.flipped)[2]
@@ -160,8 +169,9 @@ function POMDPs.gen(mdp::WhiteBoxMDP, state::WhiteBoxState, act, rng=Random.GLOB
                 end
             end
             best_new_adv_suffix = tokenizer.decode(combined)
-            loss = losses.__getitem__(best_new_adv_suffix_ids).mean()
-            loss = loss.detach().cpu().numpy()[1]
+            loss = combined_losses.__getitem__(best_new_adv_suffix_ids).mean().detach().cpu().numpy()[1]
+            nll = losses.__getitem__(best_new_adv_suffix_ids).mean().detach().cpu().numpy()[1]
+            log_ppl = log_ppls.__getitem__(best_new_adv_suffix_ids).mean().detach().cpu().numpy()[1] / params.λ_perp
         end
 
         torch.set_grad_enabled(true)
@@ -170,7 +180,7 @@ function POMDPs.gen(mdp::WhiteBoxMDP, state::WhiteBoxState, act, rng=Random.GLOB
         rethrow(err)
     end
 
-    sp = WhiteBoxState(mdp, best_new_adv_suffix; check_success=true, loss)
+    sp = WhiteBoxState(mdp, best_new_adv_suffix; check_success=true, loss, nll, log_ppl)
     r = params.flipped ? loss : -loss # NOTE for MDPs: maximize reward == minimize loss (but we want to maximize the loss in the flipped case)
 
     show_critical = mdp.params.verbose_critical && sp.is_success
@@ -196,13 +206,13 @@ function POMDPs.gen(mdp::WhiteBoxMDP, state::WhiteBoxState, act, rng=Random.GLOB
             (data,i,j)->data[i,j] == false,
             foreground = :magenta
         )
-        print_box(Any[sp.is_success loss r], ["Success", "Loss", "Reward"], color=crayon"yellow bold", highlighters=(high_true, high_false))
+        prob = exp(-nll)
+        print_box(Any[sp.is_success loss r nll prob log_ppl], ["Success", "Loss", "Reward", "NLL", "Probability", "Log-perplexity"], color=crayon"yellow bold", highlighters=(high_true, high_false))
     end
 
-    push!(mdp.data, (loss=loss, suffix=best_new_adv_suffix, is_success=sp.is_success, state=sp))
+    push!(mdp.data, (loss=loss, nll=nll, log_ppl=log_ppl, suffix=best_new_adv_suffix, is_success=sp.is_success, state=sp))
 
     cleanup()
-    # push!(mdp.data, sp)
     return (; sp, r)
 end
 

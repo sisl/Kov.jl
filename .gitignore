@@ -3,3 +3,5 @@ data/results
 losses.png
 python/gcg/__pycache__
 *.bson
+server/*.log
+scratch/
