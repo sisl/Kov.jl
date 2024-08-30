@@ -1,5 +1,5 @@
 # Kov.jl
-
+[![arXiv](https://img.shields.io/badge/arXiv-2408.08899-b31b1b.svg)](https://arxiv.org/abs/2408.08899)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Black-box jailbreaking of large language models (LLMs) using Markov decision processes, integrated into [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl).
@@ -9,6 +9,17 @@ Black-box jailbreaking of large language models (LLMs) using Markov decision pro
 <p align="center">
     <img src="./media/red-teaming-mcts.svg">
 </p>
+
+## Citation
+See the [preprint on arXiv](https://arxiv.org/abs/2408.08899).
+```
+@article{moss2024kov,
+  title={{{K}ov: Transferable and Naturalistic Black-Box {LLM} Attacks using {M}arkov Decision Processes and Tree Search}},
+  author={Moss, Robert J.},
+  journal={arXiv 2408.08899},
+  year={2024},
+}
+```
 
 ## Example LLM Prompts and Responses
 
