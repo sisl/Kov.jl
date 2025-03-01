@@ -100,7 +100,7 @@ function POMDPs.actions(mdp::WhiteBoxMDP, state::WhiteBoxState)
             """
             cleanup()
         end
-    catch
+    catch err
         torch.set_grad_enabled(true)
         rethrow(err)
     end
