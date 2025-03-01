@@ -6,3 +6,5 @@ peft
 bitsandbytes
 fastapi
 numpy
+sentencepiece
+protobuf
