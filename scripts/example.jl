@@ -15,7 +15,7 @@ surrogate = WhiteBoxMDP(whitebox_params)
 target_model = gpt_model("gpt-3.5-turbo")
 
 mdp = BlackBoxMDP(target_model, surrogate, whitebox_params.prompt)
-policy = solve(mdp.solver, mdp)
+policy = solve(mdp.params.solver, mdp)
 
 s0 = rand(initialstate(mdp))
 a = action(policy, s0)
