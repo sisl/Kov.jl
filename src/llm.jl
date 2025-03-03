@@ -41,6 +41,7 @@ end
 
 evaluate(m::BlackBoxMDP, prompt::String; kwargs...) = evaluate(m.target_model, prompt; kwargs...)
 function evaluate(model::Union{GPT,LLaMa,Vicuna}, prompt::String; temperature=0)
+    println("\n====== Using locally defined blackbox evaluate function ======\n")
     local response = "[BLANK]"
     try
         completion = model.llm.chat.completions.create(
@@ -70,7 +71,7 @@ function completion(model::GPT, prompt::String; temperature=0.7, n=1)
 end
 
 moderation(content::SubString) = moderation(string(content))
-function moderation(content::String)
+function moderation(content::String)   # moderation basically means generation with safety guidelines
     model = gpt_model("text-moderation-latest")
     mod = model.llm.moderations.create(
         model=model.name,

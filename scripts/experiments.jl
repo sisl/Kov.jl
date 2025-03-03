@@ -12,7 +12,7 @@ RUN_BASELINE = false
 if @isdefined(surrogate)
     surrogate.params.seed = 0 # reset seed
 else
-    model_path = expanduser("~/vicuna/vicuna-7b-v1.5")
+    model_path = expanduser("lmsys/vicuna-7b-v1.5")
 
     whitebox_params = WhiteBoxParams(; model_path)
 

@@ -1,3 +1,11 @@
+"""
+This file defines:
+- WhiteBoxState
+- WhiteBoxAction
+- WhiteBoxParams
+- WhiteBoxMDP. 
+"""
+
 struct WhiteBoxState
     adv_suffix
     suffix_manager
@@ -55,7 +63,7 @@ end
     max_generate_tokens = 64
     include_perp = true
     λ_perp = 0.01
-    solver = DPWSolver(n_iterations=4,
+    solver = DPWSolver(n_iterations=4,   # From POMDP deoendency
                        depth=1,
                        check_repeat_action=true,
                        exploration_constant=1.0,

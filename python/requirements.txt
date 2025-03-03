@@ -5,6 +5,7 @@ torch
 peft
 bitsandbytes
 fastapi
-numpy
+numpy==1.23.0
 sentencepiece
 protobuf
+fastchat
