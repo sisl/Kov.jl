@@ -1,3 +1,10 @@
+"""
+This file defines:
+- BlackBoxState
+- BlackBoxParams
+- BlackBoxMDP
+"""
+
 abstract type LLM end
 
 @with_kw struct BlackBoxState

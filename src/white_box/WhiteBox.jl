@@ -42,7 +42,7 @@ include("plotting.jl")
 
 function __init__()
     if Sys.iswindows()
-        ENV["PYTHON"] = "C:/Python310/python.exe"
+        ENV["PYTHON"] = "/scratch/bc3194/conda-envs/kovjl/bin/python.exe"
         Pkg.build("PyCall")
         py"""
         import sys
